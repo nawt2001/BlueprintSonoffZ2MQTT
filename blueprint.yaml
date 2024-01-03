@@ -1,0 +1,55 @@
+blueprint:
+  name: Check_entities_for_inactivity
+  description: Sends notification if specified entities haven't changed in over a day.
+  domain: automation
+  input:
+    entities_to_check:
+      name: Entities to Check
+      description: List of entities to monitor for inactivity.
+      selector:
+        entity:
+    notification_service:
+      name: Notification Service
+      description: Service to send notifications.
+      selector:
+        target:
+
+trigger:
+  - platform: time_pattern
+    hours: '/1'
+    minutes: '00'
+
+variables:
+  entities_not_changed: []
+
+condition:
+  - condition: template
+    value_template: "{{ (as_timestamp(now()) - state_attr(trigger.entity_id, 'last_updated') | default(as_timestamp(now()) - state.last_changed.timestamp())) > 86400 }}"
+    for: 00:01:00
+
+action:
+  - variables:
+      entity_name: "{{ trigger.to_state.name }}"
+    choose:
+      - conditions: "{{ entity_name not in entities_not_changed }}"
+        sequence:
+          - service: script.turn_on  # Vervang dit door je specifieke call service voor meldingen
+            data:
+              message: "The entity {{ entity_name }} has not changed for over a day."
+          - service: "{{ notification_service }}"
+            data:
+              message: "The entity {{ entity_name }} has not changed for over a day."
+
+  - service: script.turn_on  # Vervang dit door je specifieke call service voor meldingen
+    data_template:
+      entity_ids: "{{ trigger.entity_id }}"
+  - service: "{{ notification_service }}"
+    data_template:
+      message: "The entity {{ trigger.to_state.name }} has not changed for over a day."
+
+  - service: script.turn_on  # Vervang dit door je specifieke call service voor meldingen
+    data:
+      message: "The following entities have not changed for over a day: {{ entities_not_changed | join(', ') }}"
+  - service: "{{ notification_service }}"
+    data:
+      message: "The following entities have not changed for over a day: {{ entities_not_changed | join(', ') }}"
